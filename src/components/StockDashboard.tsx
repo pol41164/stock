@@ -9,6 +9,7 @@ import { useRealtimeQuotes } from "@/hooks/useRealtimeQuotes";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { useAiAnalysis, type AiState } from "@/hooks/useAiAnalysis";
 import AddStockForm from "./AddStockForm";
+import SiteHeader from "./SiteHeader";
 import WatchCard from "./WatchCard";
 import { OrderBook, QuoteSummary } from "./QuoteCard";
 import PriceChart from "./PriceChart";
@@ -56,38 +57,26 @@ export default function StockDashboard() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-border bg-background/75 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Logo />
-            <div className="leading-tight">
-              <h1 className="text-[15px] font-semibold tracking-tight">我的股票摘要站</h1>
-              <p className="hidden text-[11px] text-muted sm:block">台股監控儀表板</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {codes.length > 0 && (
-              <div className="hidden items-center gap-3 text-[11px] text-muted md:flex">
-                {error && <span className="text-up">更新失敗，顯示上次資料</span>}
-                {updatedAt && (
-                  <span className="tabular-nums">{updatedAt.toLocaleTimeString("zh-TW", { hour12: false })} 更新</span>
-                )}
-                <MarketBadge live={live} />
-              </div>
+      <SiteHeader>
+        {codes.length > 0 && (
+          <div className="hidden items-center gap-3 text-[11px] text-muted md:flex">
+            {error && <span className="text-up">更新失敗，顯示上次資料</span>}
+            {updatedAt && (
+              <span className="tabular-nums">{updatedAt.toLocaleTimeString("zh-TW", { hour12: false })} 更新</span>
             )}
-            <AddStockForm onAdd={add} />
-            <button
-              onClick={() => setSettingsOpen(true)}
-              aria-label="設定"
-              title="設定"
-              className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface text-secondary ring-1 ring-border transition-colors hover:text-foreground"
-            >
-              <GearIcon />
-            </button>
+            <MarketBadge live={live} />
           </div>
-        </div>
-      </header>
+        )}
+        <AddStockForm onAdd={add} />
+        <button
+          onClick={() => setSettingsOpen(true)}
+          aria-label="設定"
+          title="設定"
+          className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface text-secondary ring-1 ring-border transition-colors hover:text-foreground"
+        >
+          <GearIcon />
+        </button>
+      </SiteHeader>
 
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex items-end justify-between gap-3">
@@ -173,24 +162,6 @@ function GearIcon() {
       />
       <circle cx="10" cy="10" r="2.3" fill="none" stroke="currentColor" strokeWidth={1.4} />
     </svg>
-  );
-}
-
-function Logo() {
-  return (
-    <div className="flex size-9 items-center justify-center rounded-xl bg-foreground text-background shadow-card">
-      <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
-        <path
-          d="M3 14l4-4.5 3 2.5 6-7"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle cx="16" cy="5" r="1.6" fill="currentColor" />
-      </svg>
-    </div>
   );
 }
 
