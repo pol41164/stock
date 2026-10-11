@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "My Stock",
+  title: "我的股票摘要站",
   description: "台股股價查詢",
 };
 

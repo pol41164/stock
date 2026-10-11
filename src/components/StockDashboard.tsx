@@ -61,7 +61,7 @@ export default function StockDashboard() {
           <div className="flex items-center gap-3">
             <Logo />
             <div className="leading-tight">
-              <h1 className="text-[15px] font-semibold tracking-tight">My Stock</h1>
+              <h1 className="text-[15px] font-semibold tracking-tight">我的股票摘要站</h1>
               <p className="hidden text-[11px] text-muted sm:block">台股監控儀表板</p>
             </div>
           </div>
