@@ -1,11 +1,12 @@
 import { cacheLife } from "next/cache";
 
 // 外資／投信買超金額排行，全部使用官方公開資料計算：
-// - 上市：證交所「三大法人買賣超日報」(T86) × 證交所 OpenAPI 每日收盤價
+// - 上市：證交所「三大法人買賣超日報」(T86) × 證交所每日收盤價
 // - 上櫃：櫃買中心 OpenAPI 三大法人日報 × 每日收盤價
 // 買超金額 = 買賣超股數 × 當日收盤價（估算值）
 const TWSE_T86 = "https://www.twse.com.tw/rwd/zh/fund/T86";
-const TWSE_CLOSE = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL";
+// 不用 openapi.twse.com.tw 的同名資料：它常落後官網一個以上交易日，會讓排行卡在舊日期
+const TWSE_CLOSE = "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY_ALL?response=json";
 const TPEX_INSTI = "https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading";
 const TPEX_CLOSE = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes";
 
@@ -45,10 +46,16 @@ async function getJson<T>(url: string): Promise<T> {
 
 async function getTwseRows(): Promise<{ date: string; rows: NetRow[] }> {
   // 先拿收盤價，用它的日期去查同一天的 T86，確保兩者日期一致
-  const closes = await getJson<{ Date: string; Code: string; ClosingPrice: string }[]>(TWSE_CLOSE);
+  // 這支即使帶 response=json 也回 CSV：日期,證券代號,證券名稱,…,收盤價(第 9 欄),…
+  const res = await fetch(TWSE_CLOSE, { headers: HEADERS });
+  if (!res.ok) throw new Error(`www.twse.com.tw 回應 ${res.status}`);
+  const closes = (await res.text())
+    .split("\n")
+    .map((line) => [...line.matchAll(/"([^"]*)"/g)].map((m) => m[1]))
+    .filter((c) => c.length >= 9);
   if (!closes.length) throw new Error("證交所收盤價沒有資料");
-  const date = rocToIso(closes[0].Date);
-  const closeMap = new Map(closes.map((c) => [c.Code.trim(), toNum(c.ClosingPrice)]));
+  const date = rocToIso(closes[0][0]);
+  const closeMap = new Map(closes.map((c) => [c[1].trim(), toNum(c[8])]));
 
   const t86 = await getJson<{ stat: string; fields?: string[]; data?: string[][] }>(
     `${TWSE_T86}?date=${date.replaceAll("-", "")}&selectType=ALLBUT0999&response=json`,
