@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { BuyRankings, RankItem } from "@/lib/insti-rank";
 import type { WatchlistEntry } from "@/app/api/watchlist/route";
+import type { SnapshotSummary } from "@/app/api/rankings/snapshots/route";
 import { getJson, type Load } from "@/lib/client";
 import SiteHeader from "./SiteHeader";
 import { Card, CardHeader, EmptyNote, Segmented, Skeleton } from "./ui";
@@ -17,17 +18,51 @@ export default function RankingsView() {
   const [data, setData] = useState<Load<BuyRankings>>({ status: "loading" });
   const [watched, setWatched] = useState<Set<string>>(new Set());
   const [top, setTop] = useState<number>(50);
+  // "live" = 目前最新排行；其他值 = 已儲存的交易日
+  const [view, setView] = useState<string>("live");
+  const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
+  const [save, setSave] = useState<{ status: "idle" | "saving" | "saved" | "error"; message?: string }>({
+    status: "idle",
+  });
 
   useEffect(() => {
-    getJson<BuyRankings>("/api/rankings")
-      .then((d) => setData({ status: "ok", data: d }))
-      .catch((e: Error) => setData({ status: "error", message: e.message }));
-
     // 標示追蹤清單中的公司（失敗就不標示）
     getJson<{ items: WatchlistEntry[] }>("/api/watchlist")
       .then(({ items }) => setWatched(new Set(items.map((i) => i.name))))
       .catch(() => {});
+
+    // 已儲存的排行（失敗就只顯示最新排行）
+    getJson<{ items: SnapshotSummary[] }>("/api/rankings/snapshots")
+      .then(({ items }) => setSnapshots(items))
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getJson<BuyRankings>(view === "live" ? "/api/rankings" : `/api/rankings/snapshots/${view}`)
+      .then((d) => !cancelled && setData({ status: "ok", data: d }))
+      .catch((e: Error) => !cancelled && setData({ status: "error", message: e.message }));
+    return () => {
+      cancelled = true;
+    };
+  }, [view]);
+
+  async function saveSnapshot() {
+    setSave({ status: "saving" });
+    try {
+      const res = await fetch("/api/rankings/snapshots", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      const item = body.item as SnapshotSummary;
+      setSnapshots((prev) => [item, ...prev.filter((s) => s.date !== item.date)].sort((a, b) => b.date.localeCompare(a.date)));
+      setSave({ status: "saved", message: `已儲存 ${item.date} 的排行` });
+    } catch (e) {
+      setSave({ status: "error", message: `儲存失敗：${(e as Error).message}` });
+    }
+  }
+
+  const liveDate = view === "live" && data.status === "ok" ? data.data.date : null;
+  const alreadySaved = liveDate !== null && snapshots.some((s) => s.date === liveDate);
 
   const foreign = data.status === "ok" ? data.data.foreign.slice(0, top) : [];
   const trust = data.status === "ok" ? data.data.trust.slice(0, top) : [];
@@ -50,8 +85,44 @@ export default function RankingsView() {
                 : "每日盤後更新 · 依買超金額由高到低"}
             </p>
           </div>
-          <Segmented label="顯示筆數" options={TOP_OPTIONS} value={top} onChange={setTop} />
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="rank-view" className="sr-only">選擇排行日期</label>
+            <select
+              id="rank-view"
+              value={view}
+              onChange={(e) => {
+                setView(e.target.value);
+                setData({ status: "loading" });
+                setSave({ status: "idle" });
+              }}
+              className="rounded-lg bg-surface px-2.5 py-1.5 text-xs ring-1 ring-border outline-none focus:ring-2 focus:ring-accent/50"
+            >
+              <option value="live">最新排行</option>
+              {snapshots.map((s) => (
+                <option key={s.date} value={s.date}>
+                  {s.date}（已儲存）
+                </option>
+              ))}
+            </select>
+            {view === "live" && (
+              <button
+                type="button"
+                onClick={saveSnapshot}
+                disabled={data.status !== "ok" || save.status === "saving"}
+                className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-30"
+              >
+                {save.status === "saving" ? "儲存中…" : alreadySaved ? "重新儲存" : "儲存排行"}
+              </button>
+            )}
+            <Segmented label="顯示筆數" options={TOP_OPTIONS} value={top} onChange={setTop} />
+          </div>
         </div>
+
+        {save.message && (
+          <p role="status" className={`-mt-3 text-xs ${save.status === "error" ? "text-up" : "text-secondary"}`}>
+            {save.message}
+          </p>
+        )}
 
         {data.status === "error" && (
           <Card className="p-6 text-sm text-secondary">排行載入失敗：{data.message}</Card>
